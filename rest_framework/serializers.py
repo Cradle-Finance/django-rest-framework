@@ -352,6 +352,11 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
             fields[key] = value
         return fields
 
+    @cached_property
+    def properties(self):
+        # Use this method for property binding, if necessary
+        return self.get_serialized_properties()
+
     @property
     def _writable_fields(self):
         for field in self.fields.values():
@@ -364,6 +369,12 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
             if not field.write_only:
                 yield field
 
+    @property
+    def _readable_serialized_properties(self):
+        for prprty_name, prprty in self.properties.items():
+            # All properties are read-only currently. Setters may be added later.
+            yield prprty_name, prprty
+
     def get_fields(self):
         """
         Returns a dictionary of {field_name: field_instance}.
@@ -372,6 +383,9 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
         # This allows users to dynamically modify the fields on a serializer
         # instance without affecting every other serializer instance.
         return copy.deepcopy(self._declared_fields)
+
+    def get_serialized_properties(self):
+        return OrderedDict()
 
     def get_validators(self):
         """
@@ -504,6 +518,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
         """
         ret = OrderedDict()
         fields = self._readable_fields
+        properties = self._readable_serialized_properties
 
         for field in fields:
             try:
@@ -523,6 +538,12 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
                 ret[field.field_name] = None
             else:
                 ret[field.field_name] = field.to_representation(attribute)
+
+        for prprty_name, prprty in properties:
+            if prprty.fget.permissions is not None:
+                if not permissions.has_access(self.context, AccessType.VIEW):
+                    continue
+            ret[prprty_name] = getattr(instance, prprty_name)
 
         return ret
 
@@ -1002,6 +1023,17 @@ class ModelSerializer(Serializer):
         return instance
 
     # Determine the fields to apply...
+
+    def get_serialized_properties(self):
+        meta = getattr(self, 'Meta', None)
+        model = getattr(meta, 'model', None)
+        if not model:
+            return super().get_serialized_properties()
+        # TODO: If needed, handle serialized properties setup in the Serializer class
+        # The user may implement a serializer class instead of using the automatically
+        # generated serializer
+        properties = getattr(model, '__serialized_properties', OrderedDict())
+        return properties
 
     def get_fields(self):
         """
