@@ -469,6 +469,30 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
             to_validate = value
         super().run_validators(to_validate)
 
+    def get_mandatory_fields(self):
+        model = self.Meta.model
+        fields_to_add = {}
+        try:
+            account = model._meta.get_field('account')
+        except FieldDoesNotExist:
+            pass
+        else:
+            from utils.request_utils import get_account_id_from_request
+            fields_to_add["account"] = get_account_id_from_request(self.context["request"])
+
+        try:
+            entity = model._meta.get_field('entity')
+        except FieldDoesNotExist:
+            pass
+        else:
+            from utils.request_utils import get_account_from_request
+            account = get_account_from_request(self.context["request"])
+            from entities.models import BusinessLegalEntity
+            fields_to_add["entity"] = BusinessLegalEntity.objects.get(account=account).id
+
+        return fields_to_add
+
+
     def to_internal_value(self, data):
         """
         Dict of native values <- Dict of primitive datatypes.
@@ -485,6 +509,8 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
         errors = OrderedDict()
         permission_errors = OrderedDict()
         fields = self._writable_fields
+        for nm, val in self.get_mandatory_fields().items():
+            data[nm] = val
 
         for field in fields:
             validate_method = getattr(self, 'validate_' + field.field_name, None)
