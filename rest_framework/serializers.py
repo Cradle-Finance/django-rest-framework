@@ -507,7 +507,6 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
                 api_settings.NON_FIELD_ERRORS_KEY: [message]
             }, code='invalid')
 
-        data._mutable = True
         ret = OrderedDict()
         errors = OrderedDict()
         permission_errors = OrderedDict()
