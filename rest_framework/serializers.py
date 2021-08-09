@@ -473,22 +473,24 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
         model = self.Meta.model
         fields_to_add = {}
         try:
-            account = model._meta.get_field('account')
+            account_field_name = self.get_account_field_name()
+            account = model._meta.get_field(account_field_name)
         except FieldDoesNotExist:
             pass
         else:
             from utils.request_utils import get_account_id_from_request
-            fields_to_add["account"] = get_account_id_from_request(self.context["request"])
+            fields_to_add[account_field_name] = get_account_id_from_request(self.context["request"])
 
         try:
-            entity = model._meta.get_field('entity')
+            entity_field_name = self.get_entity_field_name()
+            entity = model._meta.get_field(entity_field_name)
         except FieldDoesNotExist:
             pass
         else:
             from utils.request_utils import get_account_from_request
             account = get_account_from_request(self.context["request"])
             from entities.models import BusinessLegalEntity
-            fields_to_add["entity"] = BusinessLegalEntity.objects.get(account=account).id
+            fields_to_add[entity_field_name] = BusinessLegalEntity.objects.get(account=account).id
 
         return fields_to_add
 
@@ -505,6 +507,7 @@ class Serializer(BaseSerializer, metaclass=SerializerMetaclass):
                 api_settings.NON_FIELD_ERRORS_KEY: [message]
             }, code='invalid')
 
+        data._mutable = True
         ret = OrderedDict()
         errors = OrderedDict()
         permission_errors = OrderedDict()
